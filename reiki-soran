@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
+<meta name="robots" content="noindex,nofollow">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>例規総覧 — Compendium of Statutes</title>
@@ -958,26 +959,8 @@ boot();
 </body>
 </html>
 
-@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-echo ==== 公開用サイトの生成（パスワード付き・暗号化）====
-python tools\build_site.py
-echo.
-echo site フォルダの中身を GitHub にアップロードしてください（手順: tools\README_site.md）
-pause
+window.SITE_CONFIG={"salt": "KxAqVdq64zXVTFAbnEN+Iw==", "iter": 250000};
 
-@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-echo ==== ローカル資料の再取り込み（町・県の例規／計画／指針）====
-python tools\build_local.py
-pause
+User-agent: *
+Disallow: /
 
-@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-echo ==== 例規総覧 月次更新 ====
-python tools\monthly_update.py %*
-echo.
-if "%1"=="" pause
