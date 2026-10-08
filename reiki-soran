@@ -961,10 +961,11 @@ boot();
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-echo ==== 例規総覧 月次更新 ====
-python tools\monthly_update.py %*
+echo ==== 公開用サイトの生成（パスワード付き・暗号化）====
+python tools\build_site.py
 echo.
-if "%1"=="" pause
+echo site フォルダの中身を GitHub にアップロードしてください（手順: tools\README_site.md）
+pause
 
 @echo off
 chcp 65001 >nul
@@ -976,8 +977,7 @@ pause
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-echo ==== 公開用サイトの生成（パスワード付き・暗号化）====
-python tools\build_site.py
+echo ==== 例規総覧 月次更新 ====
+python tools\monthly_update.py %*
 echo.
-echo site フォルダの中身を GitHub にアップロードしてください（手順: tools\README_site.md）
-pause
+if "%1"=="" pause
