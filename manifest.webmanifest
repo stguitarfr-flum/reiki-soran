@@ -1,0 +1,16 @@
+{
+  "name": "例規総覧 — Compendium of Statutes",
+  "short_name": "例規総覧",
+  "description": "国・県・町の法令・条例・規則・指針を横断して調べる",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f2342",
+  "theme_color": "#0f2342",
+  "lang": "ja",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

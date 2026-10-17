@@ -5,6 +5,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>例規総覧 — Compendium of Statutes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0f2342">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="例規総覧">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -86,6 +94,12 @@ input,select,textarea{font-family:inherit;font-size:15px;color:var(--ink)}
 .res{display:block;padding:11px 18px 11px 16px;border-bottom:1px solid var(--rule);border-left:3px solid transparent;color:var(--ink)}
 .res:hover{background:rgba(179,139,63,.1);text-decoration:none;color:var(--ink)}
 .res.sel{border-left-color:var(--crimson);background:rgba(139,30,45,.07)}
+.res{position:relative}
+.res .t{padding-right:30px}
+.fav-star{position:absolute;right:12px;top:9px;font-size:21px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 4px;opacity:.7}
+.fav-star:hover{opacity:1;color:var(--gold)}
+.fav-star.on{color:var(--gold);opacity:1}
+.nav .cnt{font-size:12px;color:var(--gold2);margin-left:4px}
 .res .t{font-weight:600;font-size:16.5px;line-height:1.4}
 .res .m{font-size:12.5px;color:var(--muted);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .more-btn{display:block;width:100%;padding:12px;background:none;border:0;border-top:1px solid var(--rule);color:var(--navy2);font-size:14px}
@@ -232,6 +246,7 @@ footer{max-width:1500px;margin:0 auto;padding:0 24px 40px;color:var(--muted);fon
     </div>
     <nav class="nav">
       <a href="#/" data-nav="home">検索</a>
+      <a href="#/fav" data-nav="fav">★ お気に入り<span class="cnt" id="favCnt"></span></a>
       <a href="#/updates" data-nav="updates">更新情報<span class="dot" id="updDot" hidden></span></a>
       <a href="#/mine" data-nav="mine">マイ登録</a>
       <a href="#/help" data-nav="help">使い方</a>
@@ -340,8 +355,11 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const norm = s => String(s||"").normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
 
-let U = {docs:[],links:[],memos:{},recent:[],theme:null,ack:{}};
+let U = {docs:[],links:[],memos:{},recent:[],theme:null,ack:{},fav:[]};
 try{ const s=localStorage.getItem(LS_KEY); if(s) U=Object.assign(U,JSON.parse(s)); }catch(e){}
+U.fav = Array.isArray(U.fav) ? U.fav : [];
+const isFav = k => U.fav.includes(k);
+const favLabel = k => isFav(k) ? "★ お気に入り済み" : "☆ お気に入りに追加";
 const save = () => { try{ localStorage.setItem(LS_KEY,JSON.stringify(U)); }catch(e){} };
 
 /* ---- 索引構築 ---- */
@@ -379,7 +397,7 @@ function loadDText(g){ window.DTEXT=window.DTEXT||{}; return loadData("data/dtex
 async function ensureBodies(){ await Promise.all(DT_GROUPS.map(loadDText)); ITEMS.forEach(it=>{ if(it.kind==="doc"&&it.d.hasText&&!it.body&&window.DTEXT&&DTEXT[it.d.id]) it.body=norm(DTEXT[it.d.id]); }); }
 
 /* ======================= 検索 ======================= */
-const F = {body:false,q:"",levels:new Set(),kind:"",cat:"",text:false,docs:false,freq:false,tag:"",limit:150};
+const F = {fav:false,body:false,q:"",levels:new Set(),kind:"",cat:"",text:false,docs:false,freq:false,tag:"",limit:150};
 function score(it,toks){
   let s=0;
   for(const t of toks){
@@ -396,6 +414,7 @@ function runSearch(){
   const toks = norm(F.q).split(/\s+/).filter(Boolean);
   const out=[];
   for(const it of ITEMS){
+    if(F.fav && !isFav(it.key)) continue;
     if(F.levels.size && !F.levels.has(it.level)) continue;
     if(F.kind && it.cls!==F.kind) continue;
     if(F.cat && !(it.kind==="law" && L[it.i][I.CATS].includes(+F.cat))) continue;
@@ -408,7 +427,7 @@ function runSearch(){
     else { s = (it.freq?50:0)+(it.kind==="doc"?(it.d.local?3:30):0)+(it.tags.length?10:0)+(it.text?5:0); }
     out.push([s,it]);
   }
-  const noCond = !toks.length && !F.levels.size && !F.kind && !F.cat && !F.text && !F.docs && !F.freq && !F.tag;
+  const noCond = !F.fav && !toks.length && !F.levels.size && !F.kind && !F.cat && !F.text && !F.docs && !F.freq && !F.tag;
   out.sort((a,b)=>b[0]-a[0] || (a[1].title<b[1].title?-1:1));
   return {list:out.map(x=>x[1]),noCond,toks};
 }
@@ -438,7 +457,7 @@ function renderResults(){
     if(it.kind==="law"){ const l=L[it.i]; sub.push(esc(l[I.NUM])); if(l[I.ABBR]) sub.push("略称："+esc(l[I.ABBR])); if(it.unenf) sub.push('<span class="badge b-warn">未施行あり</span>'); if(it.text) sub.push("📖条文収録"); }
     else { sub.push(esc(it.d.issuer||"")); if(it.d.number) sub.push(esc(it.d.number)); if(it.d.user) sub.push("マイ登録"); if(it.d.sample) sub.push('<span class="badge b-warn">登録例</span>'); }
     return `<a class="res${it.key===cur?" sel":""}" href="#/${it.kind==="law"?"law/"+L[it.i][I.ID]:"doc/"+esc(it.d.id)}">
-      <div class="t">${hl(it.title,toks)}</div>
+      <span class="fav-star${isFav(it.key)?" on":""}" data-fav="${esc(it.key)}" title="お気に入り">${isFav(it.key)?"★":"☆"}</span><div class="t">${hl(it.title,toks)}</div>
       <div class="m">${levelBadge(it.level)}${clsBadge(it.cls)}${sub.filter(Boolean).map(s=>`<span>${s}</span>`).join("")}</div></a>`;
   });
   let html = parts.join("") || `<div class="empty" style="padding:22px">該当する例規がありません。語句を変えるか、条件をクリアしてください。</div>`;
@@ -448,8 +467,8 @@ function renderResults(){
 }
 
 function initFilters(){
-  $("#lvChips").innerHTML = ["国","県","町"].map(l=>`<button class="chip lv-${l}" data-lv="${l}">${l}の例規</button>`).join("");
-  $("#lvChips").onclick=e=>{const b=e.target.closest("[data-lv]"); if(!b)return; const l=b.dataset.lv; F.levels.has(l)?F.levels.delete(l):F.levels.add(l); b.classList.toggle("on"); F.limit=150; renderResults();};
+  $("#lvChips").innerHTML = ["国","県","町"].map(l=>`<button class="chip lv-${l}" data-lv="${l}">${l}の例規</button>`).join("")+`<button class="chip" data-favchip="1">★ お気に入り</button>`;
+  $("#lvChips").onclick=e=>{ const fc=e.target.closest("[data-favchip]"); if(fc){ F.fav=!F.fav; fc.classList.toggle("on",F.fav); F.limit=150; renderResults(); return; } const b=e.target.closest("[data-lv]"); if(!b)return; const l=b.dataset.lv; F.levels.has(l)?F.levels.delete(l):F.levels.add(l); b.classList.toggle("on"); F.limit=150; renderResults();};
   const kinds=["憲法","法律","政令","府省令","規則","条例","要綱","告示","通達","指針","ガイドライン","計画","例規集"];
   $("#kindSel").innerHTML=`<option value="">種別：すべて</option>`+kinds.map(k=>`<option>${k}</option>`).join("");
   $("#catSel").innerHTML=`<option value="">分野：すべて</option>`+Object.entries(CATS).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join("");
@@ -463,7 +482,7 @@ function initFilters(){
   $("#fFreq").onchange=e=>{F.freq=e.target.checked;F.limit=150;renderResults();};
   $("#fBody").onchange=async e=>{ F.body=e.target.checked; if(F.body){ $("#resCount").textContent="本文を読み込み中…"; await ensureBodies(); } F.limit=150; renderResults(); };
   let tm; $("#q").oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>{F.q=e.target.value;F.limit=150;renderResults();},90);};
-  $("#clearF").onclick=e=>{e.preventDefault();F.q="";F.levels.clear();F.kind=F.cat=F.tag="";F.text=F.docs=F.freq=false;F.limit=150;
+  $("#clearF").onclick=e=>{e.preventDefault();F.q="";F.levels.clear();F.kind=F.cat=F.tag="";F.text=F.docs=F.freq=F.fav=false;F.limit=150;
     $("#q").value="";$("#kindSel").value="";$("#catSel").value="";["#fText","#fDocs","#fFreq"].forEach(s=>$(s).checked=false);
     document.querySelectorAll(".chip.on").forEach(c=>c.classList.remove("on")); renderResults();};
   document.addEventListener("keydown",e=>{ if(e.key==="/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("#q").focus();$("#q").select();} });
@@ -600,6 +619,7 @@ function showLaw(id){
     <div class="actions">
       <a class="btn pri" href="https://laws.e-gov.go.jp/law/${esc(id)}" target="_blank" rel="noopener">e-Gov で原典を開く ↗</a>
       <button class="btn" id="cpCite">引用表記をコピー</button>
+      <button class="btn${isFav(key)?" pri":""}" id="favBtn" data-fav="${esc(key)}">${favLabel(key)}</button>
       <button class="btn" id="addLink">＋ 関連づけを追加</button>
       <button class="btn" onclick="window.print()">印刷</button>
     </div>
@@ -725,6 +745,7 @@ function showDoc(id){
     <div class="actions">
       ${d.file?`<a class="btn pri" href="${esc(fileUrl(d.file))}" target="_blank" rel="noopener">PDFを開く（ローカル）</a>`:(d.drive?`<a class="btn pri" href="${esc(d.drive)}" target="_blank" rel="noopener">PDFをGoogleドライブで探す ↗</a>`:"")}
       ${url?`<a class="btn${d.file?"":" pri"}" href="${esc(url)}" target="_blank" rel="noopener">原典を開く ↗</a>`:""}
+      <button class="btn${isFav(key)?" pri":""}" id="favBtn" data-fav="${esc(key)}">${favLabel(key)}</button>
       <button class="btn" id="addLink">＋ 関連づけを追加</button>
       ${d.user?`<button class="btn" id="editDoc">編集</button>`:`<a class="btn" href="#/mine?copy=${esc(id)}">コピーして編集</a>`}
     </div>
@@ -789,6 +810,7 @@ function toast(t){ const d=document.createElement("div"); d.style.cssText="posit
 function daysSince(s){ if(!s) return 9999; const d=new Date(s.replace(/-/g,"/")); return Math.floor((Date.now()-d.getTime())/864e5); }
 function watchedIds(){
   const s=new Set(Object.keys(lawTags));
+  U.fav.forEach(k=>{ if(k.startsWith("L:")) s.add(k.slice(2)); });
   docLinks().forEach(x=>{ [x.a,x.b].forEach(k=>{ if(k.startsWith("L:")) s.add(k.slice(2)); }); });
   return s;
 }
@@ -874,6 +896,38 @@ function showMine(qs){
 function initTagChips(){ renderResults(); }
 
 /* ======================= ホーム／使い方 ======================= */
+function updFavNav(){ const n=U.fav.filter(k=>titleOfKey(k)!==k).length; const el=$("#favCnt"); if(el) el.textContent=n?"("+n+")":""; }
+function toggleFav(k){
+  const i=U.fav.indexOf(k); if(i>=0) U.fav.splice(i,1); else U.fav.unshift(k);
+  save(); const on=isFav(k);
+  document.querySelectorAll("[data-fav]").forEach(el=>{
+    if(el.dataset.fav!==k) return;
+    if(el.classList.contains("fav-star")){ el.classList.toggle("on",on); el.textContent=on?"★":"☆"; }
+    else if(el.id==="favBtn"){ el.textContent=favLabel(k); el.classList.toggle("pri",on); }
+  });
+  updFavNav(); if(F.fav) renderResults();
+  const h=location.hash||"#/";
+  if(h.startsWith("#/fav")) showFav(); else if(h==="#/"||h==="#") showHome();
+  toast(on?"お気に入りに追加しました":"お気に入りから外しました");
+}
+function favList(keys){
+  const ch=latestChanged();
+  return keys.map(k=>`<a class="rel-item" href="${esc(hrefOfKey(k))}">${levelBadge(levelOfKey(k))}${clsBadge(clsOfKey(k))}<span class="rt">${esc(titleOfKey(k))}</span>${k.startsWith("L:")&&ch.has(k.slice(2))?'<span class="badge b-warn">直近で改正</span>':""}<span class="rn"><button class="rm" data-fav="${esc(k)}" title="お気に入りから外す">★ 外す</button></span></a>`).join("");
+}
+function favHome(){
+  const ks=U.fav.filter(k=>titleOfKey(k)!==k).slice(0,8); if(!ks.length) return "";
+  return `<div style="max-width:620px;margin:0 auto 10px;text-align:left"><div class="sec-h">★ お気に入り <span class="n"><a href="#/fav">すべて見る</a></span></div>${favList(ks)}</div>`;
+}
+function showFav(){
+  CURKEY=null;
+  const ks=U.fav.filter(k=>titleOfKey(k)!==k);
+  const grp=lv=>ks.filter(k=>levelOfKey(k)===lv);
+  const sec=(t,a)=>a.length?`<div class="sec-h">${t} <span class="n">${a.length}件</span></div>${favList(a)}`:"";
+  $("#main").innerHTML=`<div class="dhead"><div class="eyebrow"><span class="badge b-kind">Favorites</span></div><h2>★ お気に入り</h2>
+    <p style="color:var(--muted);margin:6px 0 0">法令・例規・指針の詳細画面、または検索結果の ☆ をタップして登録できます。お気に入りの法令は、月次更新で改正があると「更新情報」で要確認になります。</p></div>
+  <div class="pane">${ks.length?sec("国の法令・指針",grp("国"))+sec("茨城県",grp("県"))+sec((SET.town||"町"),grp("町")):`<div class="empty">まだお気に入りがありません。</div>`}
+  <p class="hint" style="margin-top:20px">※お気に入りはこの端末のブラウザに保存されます。端末間で移すには「マイ登録」の書き出し／読み込みを使います。</p></div>`;
+}
 function showHome(){
   CURKEY=null;
   const rec=U.recent.slice(0,8).filter(k=>titleOfKey(k)!==k);
@@ -888,6 +942,7 @@ function showHome(){
       <div class="kpi"><b>${(CUR.textIds||[]).length}</b><span>条文収録</span></div>
       <div class="kpi"><b>${LOG.length?LOG[0].date:"—"}</b><span>最終更新</span></div>
     </div>
+    ${favHome()}
     ${rec.length?`<div style="max-width:620px;margin:0 auto;text-align:left"><div class="sec-h">最近開いた項目</div>${rec.map(k=>`<a class="rel-item" href="${esc(hrefOfKey(k))}">${levelBadge(levelOfKey(k))}${clsBadge(clsOfKey(k))}<span class="rt">${esc(titleOfKey(k))}</span></a>`).join("")}</div>`:""}
     <div class="motto">Veritas · Lex · Communitas</div>
   </div>`;
@@ -919,10 +974,11 @@ function route(){
   const h=location.hash||"#/"; const [path,qs]=h.slice(1).split("?"); const seg=path.split("/").filter(Boolean);
   const v=seg[0]||"home"; ARTQ=(v==="law"&&CURKEY==="L:"+seg[1])?ARTQ:"";
   document.querySelectorAll("[data-nav]").forEach(a=>a.classList.toggle("on",a.dataset.nav===(["law","doc"].includes(v)?"home":v)));
-  const single=["updates","mine","help"].includes(v); $("#wrap").classList.toggle("single",single);
+  const single=["updates","mine","help","fav"].includes(v); $("#wrap").classList.toggle("single",single);
   const qp=new URLSearchParams(qs||"");
   if(v==="law"){ if(CURKEY!=="L:"+seg[1]) TAB="rel"; if(qp.get("tab")) TAB=qp.get("tab"); showLaw(seg[1]); }
   else if(v==="doc"){ if(CURKEY!=="D:"+seg[1]) TAB="rel"; showDoc(seg[1]); }
+  else if(v==="fav") showFav();
   else if(v==="updates") showUpdates();
   else if(v==="mine") showMine(qs);
   else if(v==="help") showHelp();
@@ -932,6 +988,7 @@ function route(){
   else if(v!=="home"||!single) window.scrollTo({top:0});
 }
 document.addEventListener("click",e=>{
+  const fv=e.target.closest("[data-fav]"); if(fv){ e.preventDefault(); e.stopPropagation(); toggleFav(fv.dataset.fav); return; }
   const t=e.target.closest("[data-togg]"); if(t){ t.closest(".rel-group").classList.toggle("open"); e.preventDefault(); return; }
   const r=e.target.closest("[data-rmlink]"); if(r){ e.preventDefault(); e.stopPropagation(); if(confirm("この関連づけを削除しますか？")){U.links.splice(+r.dataset.rmlink,1);save();route();} return; }
   const dd=e.target.closest("[data-deldoc]"); if(dd){ e.preventDefault(); e.stopPropagation(); if(confirm("この登録を削除しますか？（関連づけも解除されます）")){ const id=dd.dataset.deldoc; U.docs=U.docs.filter(x=>x.id!==id); U.links=U.links.filter(l=>l.a!=="D:"+id&&l.b!=="D:"+id); save(); buildItems(); route(); } }
@@ -950,7 +1007,7 @@ $("#subline").textContent=`国・${SET.prefecture||"県"}・${SET.town||"町"}�
   function w2(lg){ const w=watchedIds(); return lg.changed.some(c=>w.has(c[0])); }
   $("#foot").textContent=`データ生成：${META.builtAt||"—"} ／ 法令 ${L.length.toLocaleString()} 件`;
 })();
-initFilters();
+initFilters(); updFavNav();
 { const q0=new URLSearchParams(location.search).get("q"); if(q0){ F.q=q0; $("#q").value=q0; } }
 route();
 }
